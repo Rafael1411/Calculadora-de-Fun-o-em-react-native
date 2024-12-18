@@ -1,0 +1,178 @@
+import React, { useState } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, ScrollView, Modal, TouchableOpacity } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
+import { Dimensions } from 'react-native';
+
+const screenWidth = Dimensions.get('window').width;
+
+export default function App() {
+  const [expression, setExpression] = useState('');
+  const [graphVisible, setGraphVisible] = useState(false);
+  const [graphData, setGraphData] = useState({ labels: [], datasets: [] });
+  const [result, setResult] = useState('');
+
+  const appendToExpression = (value) => {
+    setExpression((prev) => prev + value);
+  };
+
+  const clearExpression = () => {
+    setExpression('');
+    setResult('');
+  };
+
+  const calculateBhaskara = () => {
+    const match = expression.match(/(-?\d*)x\^2\s*([+-]\s*\d*)x\s*([+-]\s*\d+)/);
+    if (!match) {
+      alert('Por favor, insira uma função quadrática válida.');
+      return;
+    }
+    const a = parseFloat(match[1] || 1);
+    const b = parseFloat(match[2].replace(/\s/g, ''));
+    const c = parseFloat(match[3].replace(/\s/g, ''));
+
+    const delta = b * b - 4 * a * c;
+    if (delta < 0) {
+      setResult(`As raízes são complexas: (${b * -1} ± √${-delta}i) / ${2 * a}`);
+    } else {
+      const root1 = (-b + Math.sqrt(delta)) / (2 * a);
+      const root2 = (-b - Math.sqrt(delta)) / (2 * a);
+      setResult(`As raízes são: x1 = ${root1}, x2 = ${root2}`);
+    }
+  };
+
+  const evaluateExpression = (expression, x) => {
+    try {
+      const sanitizedExpression = expression
+        .replace(/(\d)(x)/g, '$1*$2')
+        .replace(/x/g, `(${x})`)
+        .replace(/\^/g, '**');
+
+      return Function(`return ${sanitizedExpression}`)();
+    } catch (error) {
+      throw new Error('Erro ao avaliar a expressão. Verifique a sintaxe: ' + error.message);
+    }
+  };
+
+  const generateGraph = () => {
+    try {
+      const xValues = [];
+      const yValues = [];
+
+      for (let x = -10; x <= 10; x += 1) {
+        const y = evaluateExpression(expression, x);
+        xValues.push(x);
+        yValues.push(y);
+      }
+
+      setGraphData({
+        labels: xValues.map((x, index) => (index % 2 === 0 ? x.toFixed(0) : '')),
+        datasets: [{ data: yValues }],
+      });
+      setGraphVisible(true);
+    } catch (error) {
+      alert('Erro na geração do gráfico: ' + error.message);
+    }
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Calculadora de Função</Text>
+      <TextInput style={styles.input} value={expression} editable={false} />
+      <View style={styles.calculatorLayout}>
+        {['7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', '0', '+', '^', 'x'].map((item) => (
+          <TouchableOpacity key={item} style={styles.button} onPress={() => appendToExpression(item)}>
+            <Text style={styles.buttonText}>{item}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Button title="Bhaskara" onPress={calculateBhaskara} color="green" />
+      <Button title="Gerar Gráfico" onPress={generateGraph} color="blue" />
+      <Button title="Limpar" onPress={clearExpression} color="red" />
+      <Text style={styles.result}>{result}</Text>
+
+      {/* Modal para exibir o gráfico */}
+      <Modal visible={graphVisible} animationType="slide">
+        <View style={styles.modalContent}>
+          <LineChart
+            data={graphData}
+            width={screenWidth - 20}
+            height={300}
+            chartConfig={{
+              backgroundColor: '#ffffff',
+              backgroundGradientFrom: '#ffffff',
+              backgroundGradientTo: '#ffffff',
+              decimalPlaces: 2,
+              color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
+              labelColor: () => '#000',
+            }}
+            bezier
+          />
+          <TouchableOpacity onPress={() => setGraphVisible(false)} style={styles.closeButton}>
+            <Text style={{ color: 'white' }}>Fechar</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+    backgroundColor: 'white',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    width: '90%',
+    maxWidth: 400,
+    padding: 10,
+    fontSize: 18,
+    marginBottom: 20,
+    textAlign: 'right',
+  },
+  calculatorLayout: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-evenly',
+    width: '90%',
+    maxWidth: 400,
+  },
+  button: {
+    backgroundColor: '#007BFF',
+    margin: 5,
+    padding: 15,
+    borderRadius: 5,
+    width: '20%',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  result: {
+    marginTop: 20,
+    fontSize: 16,
+    color: 'gray',
+  },
+  modalContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+  },
+  closeButton: {
+    marginTop: 20,
+    backgroundColor: 'red',
+    padding: 10,
+    borderRadius: 5,
+  },
+});
